@@ -122,11 +122,16 @@
     const rnd = mulberry32(level.seed);
     const list = [];
     let x = 500;
+    let genMini = false;
     while (x < level.length - 500) {
       const gap = level.gapMin + rnd() * (level.gapMax - level.gapMin);
       x += gap;
       const roll = rnd();
       const tripleC = level.tripleChance || 0;
+      if (rnd() < 0.05) {
+        list.push({ type: 'portal', worldX: x - 30, mini: !genMini });
+        genMini = !genMini;
+      }
       if (roll < tripleC) {
         const h = 34 + rnd() * 8;
         list.push({ type: 'spike', worldX: x, width: 30, height: h });
@@ -140,6 +145,8 @@
         x += 40;
       } else if (roll < tripleC + level.doubleChance + level.blockChance) {
         list.push({ type: 'block', worldX: x, width: 44 + rnd() * 16, height: 46 + rnd() * 26 });
+      } else if (rnd() < 0.12) {
+        list.push({ type: 'pad', worldX: x, width: 46, height: 14 });
       } else {
         list.push({ type: 'spike', worldX: x, width: 40, height: 38 + rnd() * 16 });
       }
@@ -167,7 +174,11 @@
   const JUMP_VELOCITY = -840;
   const ORB_VELOCITY = -880;
   const ORB_RADIUS = 16;
-  const PLAYER_SIZE = 42;
+  const PAD_VELOCITY = -1080;
+  const NORMAL_PLAYER_SIZE = 42;
+  const MINI_PLAYER_SIZE = NORMAL_PLAYER_SIZE * 0.6;
+  let PLAYER_SIZE = NORMAL_PLAYER_SIZE;
+  let miniMode = false;
   const PLAYER_X = 130;
 
   const SHIP_GRAVITY = 1500;
@@ -201,11 +212,22 @@
   const player = { y: 0, vy: 0, onGround: true, rot: 0, squash: 0 };
 
   function resetPlayer() {
+    miniMode = miniModeSelected;
+    PLAYER_SIZE = miniModeSelected ? MINI_PLAYER_SIZE : NORMAL_PLAYER_SIZE;
     player.y = GROUND_Y - PLAYER_SIZE;
     player.vy = 0;
     player.onGround = true;
     player.rot = 0;
     player.squash = 0;
+  }
+
+  function setMiniMode(mini) {
+    if (miniMode === mini) return;
+    miniMode = mini;
+    const bottom = player.y + PLAYER_SIZE;
+    PLAYER_SIZE = mini ? MINI_PLAYER_SIZE : NORMAL_PLAYER_SIZE;
+    player.y = bottom - PLAYER_SIZE;
+    bursts.push(makeBurst(PLAYER_X + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, mini ? '#7cf9ff' : '#ff9df7'));
   }
 
   let obstacles = [];
@@ -224,7 +246,11 @@
     lastObstacleWorldX += gap;
 
     if (type === 'spike') {
-      obstacles.push({ type: 'spike', worldX: lastObstacleWorldX, width: 40, height: rand(38, 54) });
+      if (Math.random() < 0.12) {
+        obstacles.push({ type: 'pad', worldX: lastObstacleWorldX, width: 46, height: 14 });
+      } else {
+        obstacles.push({ type: 'spike', worldX: lastObstacleWorldX, width: 40, height: rand(38, 54) });
+      }
     } else if (type === 'double') {
       const h = rand(36, 46);
       obstacles.push({ type: 'spike', worldX: lastObstacleWorldX, width: 34, height: h });
@@ -514,6 +540,9 @@
     ];
     if (tool === 'block') return [{ type: 'block', worldX, width: 50, height: 60 }];
     if (tool === 'orb') return [{ type: 'orb', worldX, height: 110, radius: ORB_RADIUS }];
+    if (tool === 'pad') return [{ type: 'pad', worldX, width: 46, height: 14 }];
+    if (tool === 'miniPortal') return [{ type: 'portal', worldX, mini: true }];
+    if (tool === 'normalPortal') return [{ type: 'portal', worldX, mini: false }];
     return [];
   }
 
@@ -527,6 +556,9 @@
           const cy = GROUND_Y - o.height;
           const dx = clientX - sx, dy = clientY - cy;
           return dx * dx + dy * dy <= (o.radius + 10) * (o.radius + 10);
+        }
+        if (o.type === 'portal') {
+          return clientX >= sx - 10 && clientX <= sx + 10 && clientY >= -10 && clientY <= GROUND_Y + 10;
         }
         const topY = o.type === 'pipe' ? 0 : GROUND_Y - o.height;
         return clientX >= sx - 6 && clientX <= sx + o.width + 6 && clientY >= topY - 10 && clientY <= GROUND_Y + 10;
@@ -561,7 +593,11 @@
 
   function enterEditor() {
     state = 'editor';
-    obstacles.forEach(o => { if (o.type === 'orb') o.used = false; });
+    obstacles.forEach(o => {
+      if (o.type === 'orb') o.used = false;
+      if (o.type === 'pad') o.triggered = false;
+      if (o.type === 'portal') o.passed = false;
+    });
     hideAllScreens();
     editorPanel.classList.remove('hidden');
     scoreEl.classList.add('hidden');
@@ -695,12 +731,19 @@
   });
   checkpointBtnEl.addEventListener('click', placeCheckpoint);
 
-  document.querySelectorAll('.playModePill').forEach(btn => {
+  document.querySelectorAll('#playModeRow .playModePill').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.playModePill').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#playModeRow .playModePill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       levelPlayMode = btn.dataset.playMode;
     });
+  });
+
+  const miniModeToggleBtn = document.getElementById('miniModeToggle');
+  let miniModeSelected = false;
+  miniModeToggleBtn.addEventListener('click', () => {
+    miniModeSelected = !miniModeSelected;
+    miniModeToggleBtn.classList.toggle('active', miniModeSelected);
   });
 
   endlessBtn.addEventListener('click', startEndless);
@@ -847,7 +890,7 @@
     }
 
     for (const o of obstacles) {
-      if (o.type === 'orb') continue;
+      if (o.type === 'orb' || o.type === 'pad' || o.type === 'portal') continue;
       const r = obstacleScreenRect(o);
       if (o.type === 'spike') {
         const inset = { x: r.x + r.w * 0.28, y: r.y + r.h * 0.35, w: r.w * 0.44, h: r.h * 0.65 };
@@ -896,6 +939,14 @@
     }
     distance += speed * dt;
 
+    for (const o of obstacles) {
+      if (o.type !== 'portal' || o.passed) continue;
+      if (distance + PLAYER_X >= o.worldX) {
+        o.passed = true;
+        setMiniMode(o.mini);
+      }
+    }
+
     player.vy += GRAVITY * dt;
     const prevBottom = player.y + PLAYER_SIZE;
     player.y += player.vy * dt;
@@ -919,6 +970,20 @@
         player.y = GROUND_Y - PLAYER_SIZE;
         player.vy = 0;
         grounded = true;
+      }
+    }
+
+    if (grounded) {
+      const playerLeft = PLAYER_X, playerRight = PLAYER_X + PLAYER_SIZE;
+      for (const o of obstacles) {
+        if (o.type !== 'pad' || o.triggered) continue;
+        const screenX = o.worldX - distance;
+        if (screenX + o.width <= playerLeft || screenX >= playerRight) continue;
+        o.triggered = true;
+        player.vy = PAD_VELOCITY;
+        grounded = false;
+        bursts.push(makeBurst(PLAYER_X + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, '#39ff8a'));
+        break;
       }
     }
     if (grounded && !player.onGround) player.squash = 1;
@@ -1120,6 +1185,23 @@
         continue;
       }
 
+      if (o.type === 'portal') {
+        const screenX = o.worldX - distance;
+        if (screenX > W + 20 || screenX < -20) continue;
+        const color = o.mini ? '#7cf9ff' : '#ff9df7';
+        ctx.save();
+        ctx.globalAlpha = o.passed ? 0.35 : 0.85;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 24;
+        const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, o.mini ? '#0f4d86' : '#7a0068');
+        ctx.fillStyle = grad;
+        ctx.fillRect(screenX - 5, 0, 10, GROUND_Y);
+        ctx.restore();
+        continue;
+      }
+
       if (o.type === 'orb') {
         const pos = orbScreenPos(o);
         if (pos.x > W + 30 || pos.x < -30) continue;
@@ -1162,6 +1244,23 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      } else if (o.type === 'pad') {
+        ctx.shadowColor = '#39ff8a';
+        const grad = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+        grad.addColorStop(0, '#eaffdb');
+        grad.addColorStop(1, '#39ff8a');
+        ctx.fillStyle = o.triggered ? 'rgba(57,255,138,0.3)' : grad;
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w / 2, r.y - 12);
+        ctx.lineTo(r.x + r.w * 0.22, r.y + 2);
+        ctx.lineTo(r.x + r.w * 0.78, r.y + 2);
+        ctx.closePath();
+        ctx.fillStyle = o.triggered ? 'rgba(57,255,138,0.3)' : '#39ff8a';
+        ctx.fill();
       } else {
         const grad = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
         grad.addColorStop(0, '#4ff2ff');

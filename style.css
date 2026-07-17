@@ -337,6 +337,17 @@ canvas#game {
   box-shadow: 0 0 10px rgba(79,242,255,0.4);
 }
 
+.playModePill.miniToggle {
+  border-color: rgba(57,255,138,0.4);
+}
+
+.playModePill.miniToggle.active {
+  background: rgba(57,255,138,0.18);
+  color: #39ff8a;
+  border-color: #39ff8a;
+  box-shadow: 0 0 10px rgba(57,255,138,0.4);
+}
+
 .levelGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
