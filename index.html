@@ -15,6 +15,8 @@
 
   <button id="muteBtn" class="iconBtn" aria-label="Toggle music">&#9835;</button>
   <button id="checkpointBtn" class="iconBtn checkpointBtn hidden" aria-label="Set checkpoint">&#10003;</button>
+  <button id="moveLeftBtn" class="moveBtn left hidden" aria-label="Move left">&#9664;</button>
+  <button id="moveRightBtn" class="moveBtn right hidden" aria-label="Move right">&#9654;</button>
 
   <div id="hud">
     <div id="modeLabel" class="hidden"></div>
@@ -25,11 +27,14 @@
       <div id="levelTimer" class="hidden"></div>
       <div id="progressBarBg"><div id="progressBarFill"></div></div>
       <div id="practiceTag" class="hidden">PRACTICE MODE &mdash; CHECKPOINTS ENABLED</div>
+      <div id="levelCoinRow" class="levelCoinRow hidden"></div>
     </div>
   </div>
 
   <div id="menuScreen" class="screen">
     <h1 class="logo">NEON<span>DASH</span></h1>
+    <div class="coinBalance"><span class="coinIcon">&#9679;</span><span id="coinBalance">0</span></div>
+    <div class="diamondBalance"><span class="diamondIcon"></span><span id="menuDiamondBalance">0</span></div>
     <div class="modeGrid">
       <div class="quickModes">
         <button id="endlessBtn" class="modeBtn">
@@ -44,6 +49,10 @@
           <span class="modeTitle">SHIP</span>
           <span class="modeSub">BEST <em id="menuShipBest">0</em></span>
         </button>
+        <button id="ballBtn" class="modeBtn ball">
+          <span class="modeTitle">BALL</span>
+          <span class="modeSub">BEST <em id="menuBallBest">0</em></span>
+        </button>
       </div>
 
       <div class="chestCollectionRow">
@@ -55,6 +64,39 @@
           <span class="modeTitle">SKINS</span>
           <span class="modeSub" id="collectionCount">0 / 0</span>
         </button>
+        <button id="shopBtn" class="modeBtn shop">
+          <span class="modeTitle">SHOP</span>
+          <span class="modeSub" id="shopOwnedCount">0 / 0</span>
+        </button>
+      </div>
+
+      <div class="chestCollectionRow twoCol">
+        <button id="digBtn" class="modeBtn dig">
+          <span class="modeTitle">DIG FOR DIAMONDS</span>
+          <span class="modeSub">CLICK TO DIG UP DIAMONDS</span>
+        </button>
+        <button id="diamondShopBtn" class="modeBtn diamondShop">
+          <span class="modeTitle">DIAMOND SHOP</span>
+          <span class="modeSub" id="diamondShopOwnedCount">0 / 0</span>
+        </button>
+      </div>
+
+      <div class="chestCollectionRow twoCol">
+        <button id="slotsBtn" class="modeBtn slots">
+          <span class="modeTitle">NEON SLOTS</span>
+          <span class="modeSub">FREE SPINS FOR COINS</span>
+        </button>
+        <button id="meteorBtn" class="modeBtn meteor">
+          <span class="modeTitle">METEOR CATCH</span>
+          <span class="modeSub">CLICK GEMS FOR DIAMONDS</span>
+        </button>
+      </div>
+
+      <div class="chestCollectionRow oneCol">
+        <button id="minigamesBtn" class="modeBtn minigames">
+          <span class="modeTitle">MINIGAMES</span>
+          <span class="modeSub">35 WAYS TO EARN COINS &amp; DIAMONDS</span>
+        </button>
       </div>
 
       <div class="playModeRow">
@@ -65,9 +107,24 @@
         <button class="playModePill active" data-play-mode="normal">NORMAL</button>
         <button class="playModePill" data-play-mode="practice">PRACTICE</button>
         <button class="playModePill" data-play-mode="timetrial">TIME TRIAL</button>
+        <button class="playModePill" data-play-mode="platformer">PLATFORMER</button>
       </div>
 
       <div id="levelGrid" class="levelGrid"></div>
+
+      <div class="customLevelsSection">
+        <div class="customLevelsHeader">
+          <span>LEVEL PACKS</span>
+        </div>
+        <div id="levelPackList" class="customLevelList"></div>
+      </div>
+
+      <div class="customLevelsSection">
+        <div class="customLevelsHeader">
+          <span>GAUNTLETS</span>
+        </div>
+        <div id="gauntletList" class="customLevelList"></div>
+      </div>
 
       <div class="customLevelsSection">
         <div class="customLevelsHeader">
@@ -84,6 +141,7 @@
     <h1 class="logo small">GAME OVER</h1>
     <p class="statLine" id="gameOverStat1"></p>
     <p class="statLine" id="gameOverStat2"></p>
+    <p class="statLine accent" id="gameOverReward"></p>
     <div class="btnRow">
       <button id="retryBtn" class="menuBtnSmall">RETRY</button>
       <button id="gameOverMenuBtn" class="menuBtnSmall">MENU</button>
@@ -95,6 +153,7 @@
     <p class="statLine" id="completeLevelName"></p>
     <p class="statLine" id="completeTime"></p>
     <p class="statLine accent" id="completeBestTime"></p>
+    <p class="statLine accent" id="completeReward"></p>
     <div class="btnRow">
       <button id="nextLevelBtn" class="menuBtnSmall">NEXT LEVEL</button>
       <button id="completeMenuBtn" class="menuBtnSmall">MENU</button>
@@ -102,7 +161,7 @@
   </div>
 
   <div id="chestRevealScreen" class="screen hidden">
-    <h1 class="logo small complete">CHEST OPENED</h1>
+    <h1 class="logo small complete" id="chestRevealTitle">CHEST OPENED</h1>
     <div id="chestRevealSwatch" class="chestSwatch"></div>
     <p class="statLine" id="chestRevealName"></p>
     <p class="statLine accent" id="chestRevealSub"></p>
@@ -113,11 +172,109 @@
 
   <div id="collectionScreen" class="screen hidden">
     <h1 class="logo small">SKIN COLLECTION</h1>
+    <div class="coinBalance"><span class="coinIcon">&#9679;</span><span id="collectionCoinBalance">0</span></div>
+    <div class="playModeRow" id="collectionTabRow">
+      <button class="playModePill active" data-collection-tab="skin">CUBE SKINS</button>
+      <button class="playModePill" data-collection-tab="ship">SHIPS</button>
+      <button class="playModePill" data-collection-tab="trail">TRAILS</button>
+    </div>
+    <div class="playModeRow" id="collectionFilterRow">
+      <button class="playModePill active" data-collection-filter="all">ALL</button>
+      <button class="playModePill" data-collection-filter="owned">OWNED ONLY</button>
+    </div>
     <p class="statLine" id="collectionProgress"></p>
     <div class="rarityLegend" id="rarityLegend"></div>
     <div id="collectionGrid" class="collectionGrid"></div>
     <div class="btnRow">
       <button id="collectionBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="shopScreen" class="screen hidden">
+    <h1 class="logo small">ULTIMATE SHOP</h1>
+    <div class="coinBalance"><span class="coinIcon">&#9679;</span><span id="shopCoinBalance">0</span></div>
+    <p class="hint">EXCLUSIVE DESIGNED CUBES &mdash; NOT AVAILABLE FROM CHESTS</p>
+    <div id="shopGrid" class="shopGrid"></div>
+    <div class="btnRow">
+      <button id="shopBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="digScreen" class="screen hidden">
+    <h1 class="logo small">DIG FOR DIAMONDS</h1>
+    <div class="diamondBalance"><span class="diamondIcon"></span><span id="digDiamondBalance">0</span></div>
+    <p class="hint">CLICK A TILE TO DIG</p>
+    <div id="digGrid" class="digGrid"></div>
+    <div class="btnRow">
+      <button id="digNewPatchBtn" class="menuBtnSmall">NEW PATCH</button>
+      <button id="digBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="diamondShopScreen" class="screen hidden">
+    <h1 class="logo small">DIAMOND SHOP</h1>
+    <div class="diamondBalance"><span class="diamondIcon"></span><span id="diamondShopBalance">0</span></div>
+    <p class="hint">MYTHIC DESIGNS &mdash; DIAMONDS ONLY</p>
+    <div class="playModeRow" id="diamondShopTabRow">
+      <button class="playModePill active" data-diamond-shop-tab="skin">CUBES</button>
+      <button class="playModePill" data-diamond-shop-tab="ship">SHIPS</button>
+      <button class="playModePill" data-diamond-shop-tab="trail">TRAILS</button>
+    </div>
+    <div id="diamondShopGrid" class="shopGrid"></div>
+    <div class="btnRow">
+      <button id="diamondShopBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="slotsScreen" class="screen hidden">
+    <h1 class="logo small">NEON SLOTS</h1>
+    <div class="coinBalance"><span class="coinIcon">&#9679;</span><span id="slotsCoinBalance">0</span></div>
+    <p class="hint">FREE SPIN &mdash; MATCH SYMBOLS TO WIN COINS</p>
+    <div id="slotsReels" class="slotsReels">
+      <div class="slotReel" id="slotReel0">?</div>
+      <div class="slotReel" id="slotReel1">?</div>
+      <div class="slotReel" id="slotReel2">?</div>
+    </div>
+    <p class="statLine accent" id="slotsResult"></p>
+    <div class="btnRow">
+      <button id="slotsSpinBtn" class="menuBtnSmall">SPIN</button>
+      <button id="slotsBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="meteorScreen" class="screen hidden">
+    <h1 class="logo small">METEOR CATCH</h1>
+    <div class="diamondBalance"><span class="diamondIcon"></span><span id="meteorDiamondBalance">0</span></div>
+    <p class="hint" id="meteorHint">CLICK THE FALLING GEMS</p>
+    <div class="meteorWrap">
+      <canvas id="meteorCanvas" width="320" height="380"></canvas>
+      <div id="meteorTimer" class="meteorTimer">20</div>
+    </div>
+    <div class="btnRow">
+      <button id="meteorPlayBtn" class="menuBtnSmall">PLAY</button>
+      <button id="meteorBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="minigamesScreen" class="screen hidden">
+    <h1 class="logo small">MINIGAMES</h1>
+    <p class="hint">TAP ANY MINIGAME TO PLAY</p>
+    <div id="minigamesGrid" class="minigamesGrid"></div>
+    <div class="btnRow">
+      <button id="minigamesBackBtn" class="menuBtnSmall">BACK</button>
+    </div>
+  </div>
+
+  <div id="minigamePlayScreen" class="screen hidden">
+    <h1 class="logo small" id="minigamePlayTitle">MINIGAME</h1>
+    <div class="coinBalance hidden" id="minigamePlayCoinRow"><span class="coinIcon">&#9679;</span><span id="minigamePlayCoinBalance">0</span></div>
+    <div class="diamondBalance hidden" id="minigamePlayDiamondRow"><span class="diamondIcon"></span><span id="minigamePlayDiamondBalance">0</span></div>
+    <p class="hint" id="minigamePlayHint"></p>
+    <div id="minigameArea" class="minigameArea"></div>
+    <p class="statLine accent" id="minigamePlayResult"></p>
+    <div class="btnRow">
+      <button id="minigamePlayActionBtn" class="menuBtnSmall">PLAY</button>
+      <button id="minigamePlayBackBtn" class="menuBtnSmall">BACK</button>
     </div>
   </div>
 
@@ -132,11 +289,17 @@
       <button class="toolBtn" data-tool="double">DOUBLE</button>
       <button class="toolBtn" data-tool="triple">TRIPLE</button>
       <button class="toolBtn" data-tool="block">BLOCK</button>
+      <button class="toolBtn" data-tool="blockStructure">STAIRS</button>
       <button class="toolBtn" data-tool="orb">ORB</button>
+      <button class="toolBtn" data-tool="coin">COIN</button>
       <button class="toolBtn" data-tool="pad">PAD</button>
+      <button class="toolBtn" data-tool="movingSpike">MOVE SPIKE</button>
       <button class="toolBtn" data-tool="miniPortal">MINI</button>
       <button class="toolBtn" data-tool="normalPortal">NORMAL</button>
       <button class="toolBtn" data-tool="gravityPortal">GRAVITY</button>
+      <button class="toolBtn" data-tool="shipPortal">SHIP</button>
+      <button class="toolBtn" data-tool="ballPortal">BALL</button>
+      <button class="toolBtn" data-tool="cubePortal">CUBE</button>
       <button class="toolBtn" data-tool="erase">ERASE</button>
       <button id="editorSideToggle" class="menuBtnSmall tiny">FLOOR MODE</button>
     </div>

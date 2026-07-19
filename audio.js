@@ -32,10 +32,10 @@ window.NeonAudio = (function () {
       });
       return { bass: noteFreq(root, bassSemi), notes: notes.map(n => noteFreq(root, n)) };
     });
-    return { bars, tempo, waveArp: waveArp || 'sawtooth', waveBass: waveBass || 'sine' };
+    return { bars, tempo: Math.round(tempo * 1.12), waveArp: waveArp || 'sawtooth', waveBass: waveBass || 'sawtooth' };
   }
 
-  const LEVEL_DEFS = [
+  const LEVEL_DEFS_BASE = [
     { root: midiFreq(45), scale: 'minor', tempo: 116, progression: [0, 5, 3, 4] },
     { root: midiFreq(43), scale: 'dorian', tempo: 120, progression: [0, 3, 4, 5] },
     { root: midiFreq(47), scale: 'minor', tempo: 124, progression: [0, 4, 5, 3] },
@@ -53,11 +53,41 @@ window.NeonAudio = (function () {
     { root: midiFreq(36), scale: 'minor', tempo: 163, progression: [0, 5, 4, 3], waveArp: 'square' }
   ];
 
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function buildAdditionalLevelDefs(count) {
+    const rng = mulberry32(135792468);
+    const scales = ['minor', 'dorian', 'phrygian', 'harmonicMinor', 'pentatonic'];
+    const progressions = [[0, 5, 3, 4], [0, 3, 4, 5], [0, 4, 5, 3], [0, 5, 4, 3], [0, 3, 5, 4],
+      [0, 5, 3, 2], [0, 2, 5, 4], [0, 4, 3, 5], [0, 5, 4, 2], [0, 3, 4, 5]];
+    const list = [];
+    let tempo = 163;
+    for (let i = 0; i < count; i++) {
+      tempo = Math.min(210, tempo + 2 + Math.floor(rng() * 3));
+      const scale = scales[i % scales.length];
+      const midi = 36 + Math.floor(rng() * 18);
+      const progression = progressions[Math.floor(rng() * progressions.length)];
+      const waveArp = rng() < 0.5 ? 'square' : 'sawtooth';
+      list.push({ root: midiFreq(midi), scale, tempo, progression, waveArp });
+    }
+    return list;
+  }
+
+  const LEVEL_DEFS = [...LEVEL_DEFS_BASE, ...buildAdditionalLevelDefs(45)];
+
   const THEMES = {
     menu: buildTheme({ root: midiFreq(45), scale: 'minor', tempo: 96, progression: [0, 5, 3, 4], waveArp: 'triangle' }),
     endless: buildTheme({ root: midiFreq(45), scale: 'minor', tempo: 132, progression: [0, 5, 2, 3] }),
     hardcore: buildTheme({ root: midiFreq(40), scale: 'harmonicMinor', tempo: 158, progression: [0, 5, 3, 4], waveArp: 'square' }),
     ship: buildTheme({ root: midiFreq(43), scale: 'dorian', tempo: 122, progression: [0, 4, 5, 3], waveArp: 'triangle' }),
+    ball: buildTheme({ root: midiFreq(46), scale: 'pentatonic', tempo: 126, progression: [0, 3, 2, 4], waveArp: 'square' }),
     custom: buildTheme({ root: midiFreq(44), scale: 'dorian', tempo: 128, progression: [0, 3, 5, 4], waveArp: 'sawtooth' }),
     levels: LEVEL_DEFS.map(buildTheme)
   };
@@ -93,18 +123,57 @@ window.NeonAudio = (function () {
     osc.stop(time + 0.24);
   }
 
-  function playBass(freq, time, wave) {
+  let wobbleDistortionCurve = null;
+  function getWobbleDistortionCurve() {
+    if (wobbleDistortionCurve) return wobbleDistortionCurve;
+    const n = 256;
+    const amount = 18;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1;
+      curve[i] = ((3 + amount) * x * 20 * Math.PI / 180) / (Math.PI + amount * Math.abs(x));
+    }
+    wobbleDistortionCurve = curve;
+    return curve;
+  }
+
+  function playWobbleBass(freq, time, duration, wave) {
     const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const shaper = ctx.createWaveShaper();
     const gain = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+
     osc.type = wave;
     osc.frequency.value = freq;
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 450;
+    filter.Q.value = 5;
+
+    lfo.type = 'sine';
+    lfo.frequency.value = 8;
+    lfoGain.gain.value = 850;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+
+    shaper.curve = getWobbleDistortionCurve();
+    shaper.oversample = '2x';
+
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(0.6, time + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.5);
-    osc.connect(gain);
+    gain.gain.linearRampToValueAtTime(0.55, time + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    osc.connect(filter);
+    filter.connect(shaper);
+    shaper.connect(gain);
     gain.connect(musicGain);
+
     osc.start(time);
-    osc.stop(time + 0.55);
+    osc.stop(time + duration + 0.05);
+    lfo.start(time);
+    lfo.stop(time + duration + 0.05);
   }
 
   function scheduleStep(index, time) {
@@ -116,7 +185,8 @@ window.NeonAudio = (function () {
       playArp(chord.notes[(local / 4) % chord.notes.length], time, theme.waveArp);
     }
     if (local === 0 || local === 8) {
-      playBass(chord.bass, time, theme.waveBass);
+      const stepDur = 60 / theme.tempo / 4;
+      playWobbleBass(chord.bass, time, stepDur * 7, theme.waveBass);
     }
   }
 
