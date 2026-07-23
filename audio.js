@@ -88,6 +88,7 @@ window.NeonAudio = (function () {
     hardcore: buildTheme({ root: midiFreq(40), scale: 'harmonicMinor', tempo: 158, progression: [0, 5, 3, 4], waveArp: 'square' }),
     ship: buildTheme({ root: midiFreq(43), scale: 'dorian', tempo: 122, progression: [0, 4, 5, 3], waveArp: 'triangle' }),
     ball: buildTheme({ root: midiFreq(46), scale: 'pentatonic', tempo: 126, progression: [0, 3, 2, 4], waveArp: 'square' }),
+    ufo: buildTheme({ root: midiFreq(48), scale: 'dorian', tempo: 130, progression: [0, 2, 5, 3], waveArp: 'triangle' }),
     custom: buildTheme({ root: midiFreq(44), scale: 'dorian', tempo: 128, progression: [0, 3, 5, 4], waveArp: 'sawtooth' }),
     levels: LEVEL_DEFS.map(buildTheme)
   };
@@ -121,6 +122,76 @@ window.NeonAudio = (function () {
     gain.connect(musicGain);
     osc.start(time);
     osc.stop(time + 0.24);
+  }
+
+  let noiseBuffer = null;
+  function getNoiseBuffer() {
+    if (noiseBuffer) return noiseBuffer;
+    const size = ctx.sampleRate * 1;
+    noiseBuffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+    return noiseBuffer;
+  }
+
+  function playKick(time) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(46, time + 0.09);
+    gain.gain.setValueAtTime(0.65, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+    osc.connect(gain);
+    gain.connect(musicGain);
+    osc.start(time);
+    osc.stop(time + 0.25);
+
+    const click = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    click.type = 'square';
+    click.frequency.value = 1200;
+    clickGain.gain.setValueAtTime(0.18, time);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.015);
+    click.connect(clickGain);
+    clickGain.connect(musicGain);
+    click.start(time);
+    click.stop(time + 0.02);
+  }
+
+  function playHihat(time, open) {
+    const noise = ctx.createBufferSource();
+    noise.buffer = getNoiseBuffer();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 7500;
+    const gain = ctx.createGain();
+    const dur = open ? 0.16 : 0.045;
+    gain.gain.setValueAtTime(open ? 0.2 : 0.14, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(musicGain);
+    noise.start(time);
+    noise.stop(time + dur + 0.02);
+  }
+
+  function playClap(time) {
+    const noise = ctx.createBufferSource();
+    noise.buffer = getNoiseBuffer();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    filter.Q.value = 1.1;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.3, time + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(musicGain);
+    noise.start(time);
+    noise.stop(time + 0.2);
   }
 
   let wobbleDistortionCurve = null;
@@ -188,6 +259,12 @@ window.NeonAudio = (function () {
       const stepDur = 60 / theme.tempo / 4;
       playWobbleBass(chord.bass, time, stepDur * 7, theme.waveBass);
     }
+    // four-on-the-floor kick
+    if (local % 4 === 0) playKick(time);
+    // 8th-note hats, with an open hat accent right before each backbeat
+    if (local % 2 === 0) playHihat(time, local === 6 || local === 14);
+    // backbeat clap on 2 and 4
+    if (local === 4 || local === 12) playClap(time);
   }
 
   function scheduler() {
